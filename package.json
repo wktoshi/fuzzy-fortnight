@@ -1,0 +1,9 @@
+{
+  "name": "fuzzy-fortnight",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npx serve . -p 3000",
+    "deploy": "npm run deploy:gh-pages"
+  }
+}
