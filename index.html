@@ -2,35 +2,559 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#ff6b35" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="近くのお店" />
   <link rel="manifest" href="manifest.json" />
-  <title>Hello World!</title>
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>近くのレストラン</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    :root {
+      --primary: #ff6b35;
+      --bg: #f9f5f0;
+      --card: #ffffff;
+      --text: #1a1a1a;
+      --sub: #666;
+      --border: #ececec;
+      --open: #22a06b;
+      --closed: #e03131;
+      --shadow: 0 2px 16px rgba(0,0,0,0.10);
     }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      font-family: -apple-system, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
-      background-color: #1a1a2e;
-      font-family: sans-serif;
+      padding-bottom: env(safe-area-inset-bottom);
     }
 
-    h1 {
-      color: #e0e0e0;
-      font-size: 3rem;
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 20px 20px 16px;
+      padding-top: calc(20px + env(safe-area-inset-top));
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.02em; }
+    header p  { font-size: 0.78rem; opacity: 0.85; margin-top: 2px; }
+
+    #main { padding: 16px; max-width: 540px; margin: 0 auto; }
+
+    /* --- ボタン --- */
+    #find-btn {
+      width: 100%;
+      padding: 16px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(255,107,53,0.35);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    #find-btn:active { transform: scale(0.98); box-shadow: 0 2px 8px rgba(255,107,53,0.25); }
+    #find-btn:disabled { opacity: 0.6; cursor: default; }
+
+    /* --- ステータス --- */
+    #status {
+      text-align: center;
+      padding: 24px 0;
+      color: var(--sub);
+      font-size: 0.9rem;
+      display: none;
+    }
+    #status.visible { display: block; }
+    .spinner {
+      display: inline-block;
+      width: 28px; height: 28px;
+      border: 3px solid #ddd;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-bottom: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* --- カード --- */
+    #result { margin-top: 20px; display: none; }
+    #result.visible { display: block; }
+
+    .card {
+      background: var(--card);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    /* 店名・評価 */
+    .card-head {
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-head .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--primary);
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+    .card-head h2 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      line-height: 1.3;
+    }
+    .card-head .meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+    .rating {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #f0960a;
+    }
+    .rating svg { width: 14px; height: 14px; fill: #f0960a; }
+    .reviews-count { font-size: 0.78rem; color: var(--sub); }
+    .distance-tag {
+      background: #f0f0f0;
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 0.75rem;
+      color: var(--sub);
+      font-weight: 600;
+    }
+
+    /* セクション共通 */
+    .card-section {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-section:last-child { border-bottom: none; }
+    .section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--sub);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    /* 営業時間 */
+    .open-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 700;
+      font-size: 0.88rem;
+      margin-bottom: 8px;
+    }
+    .open-status.open  { color: var(--open); }
+    .open-status.closed { color: var(--closed); }
+    .open-status .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+    .open-status.open .dot  { background: var(--open); }
+    .open-status.closed .dot { background: var(--closed); }
+
+    .hours-list { list-style: none; }
+    .hours-list li {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      padding: 3px 0;
+      color: var(--sub);
+      border-bottom: 1px solid #f5f5f5;
+    }
+    .hours-list li:last-child { border-bottom: none; }
+    .hours-list li.today { color: var(--text); font-weight: 700; }
+    .hours-list li .day  { min-width: 80px; }
+
+    /* メニュー */
+    .menu-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      background: #fff3ed;
+      border: 1px solid #ffe0cc;
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 0.82rem;
+      color: var(--primary);
+      font-weight: 600;
+    }
+    .editorial {
+      font-size: 0.88rem;
+      color: var(--sub);
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+
+    /* Googleマップリンク */
+    .maps-link {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #1a73e8;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+    }
+    .maps-link svg { width: 16px; height: 16px; }
+
+    /* エラー */
+    .error-card {
+      background: #fff5f5;
+      border: 1px solid #fcc;
+      border-radius: 14px;
+      padding: 16px 18px;
+      color: var(--closed);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-top: 16px;
+    }
+
+    /* API KEY 警告 */
+    #api-warn {
+      background: #fffbe6;
+      border: 1px solid #ffe58f;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 0.8rem;
+      color: #7a5c00;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    #api-warn strong { display: block; margin-bottom: 4px; }
+    #api-warn code {
+      background: #fff3cc;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.78rem;
+      font-family: monospace;
     }
   </style>
 </head>
 <body>
-  <h1>Hello World!</h1>
+  <header>
+    <h1>🍽 近くのレストラン</h1>
+    <p>現在地から最寄りのお店を探します</p>
+  </header>
+
+  <div id="main">
+    <!-- APIキー未設定時の警告 -->
+    <div id="api-warn" style="display:none">
+      <strong>⚠️ Google Maps APIキーが未設定です</strong>
+      このアプリを使うには <code>index.html</code> 内の
+      <code>YOUR_GOOGLE_MAPS_API_KEY</code> を実際のAPIキーに
+      置き換えてください。<br>
+      取得先: Google Cloud Console → Maps JavaScript API + Places API を有効化
+    </div>
+
+    <button id="find-btn" onclick="findRestaurant()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2m-3.64-6.36-1.42 1.42M5.05 18.95l-1.41 1.41M18.95 18.95l-1.42-1.42M5.06 5.06 3.64 6.47"/>
+      </svg>
+      現在地から探す
+    </button>
+
+    <div id="status">
+      <div class="spinner"></div>
+      <p id="status-text">位置情報を取得中...</p>
+    </div>
+
+    <div id="result"></div>
+  </div>
+
+  <!-- Google Maps JavaScript API (Placesライブラリ) -->
+  <!-- ★ YOUR_GOOGLE_MAPS_API_KEY を実際のキーに置き換えてください ★ -->
   <script>
+    const API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY';
+
+    // APIキー未設定チェック
+    if (API_KEY === 'YOUR_GOOGLE_MAPS_API_KEY') {
+      document.getElementById('api-warn').style.display = 'block';
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status').classList.add('visible');
+      document.getElementById('status-text').textContent = msg;
+    }
+    function hideStatus() {
+      document.getElementById('status').classList.remove('visible');
+    }
+    function showResult(html) {
+      hideStatus();
+      const el = document.getElementById('result');
+      el.innerHTML = html;
+      el.classList.add('visible');
+    }
+
+    function findRestaurant() {
+      if (API_KEY === 'YOUR_GOOGLE_MAPS_API_KEY') {
+        showResult('<div class="error-card">APIキーを設定してください。上の黄色い案内をご確認ください。</div>');
+        return;
+      }
+
+      const btn = document.getElementById('find-btn');
+      btn.disabled = true;
+      document.getElementById('result').classList.remove('visible');
+      setStatus('位置情報を取得中...');
+
+      if (!navigator.geolocation) {
+        showResult('<div class="error-card">このブラウザは位置情報に対応していません。</div>');
+        btn.disabled = false;
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setStatus('近くのレストランを検索中...');
+          loadGoogleMapsAndSearch(pos.coords.latitude, pos.coords.longitude, btn);
+        },
+        (err) => {
+          const msgs = {
+            1: '位置情報へのアクセスが拒否されました。設定から許可してください。',
+            2: '位置情報を取得できませんでした。',
+            3: '位置情報の取得がタイムアウトしました。',
+          };
+          showResult(`<div class="error-card">${msgs[err.code] || '不明なエラーが発生しました。'}</div>`);
+          btn.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    function loadGoogleMapsAndSearch(lat, lng, btn) {
+      // すでにロード済みなら直接実行
+      if (window.google && window.google.maps && window.google.maps.places) {
+        searchNearby(lat, lng, btn);
+        return;
+      }
+      // Google Maps JS API を動的ロード
+      window._mapsCallback = () => searchNearby(lat, lng, btn);
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places&language=ja&callback=_mapsCallback`;
+      script.onerror = () => {
+        showResult('<div class="error-card">Google Maps APIの読み込みに失敗しました。APIキーを確認してください。</div>');
+        btn.disabled = false;
+      };
+      document.head.appendChild(script);
+    }
+
+    function searchNearby(lat, lng, btn) {
+      const center = new google.maps.LatLng(lat, lng);
+      // ダミーのマップ要素（PlacesServiceに必要）
+      const mapDiv = document.createElement('div');
+      const map = new google.maps.Map(mapDiv, { center, zoom: 15 });
+      const service = new google.maps.places.PlacesService(map);
+
+      service.nearbySearch(
+        {
+          location: center,
+          rankBy: google.maps.places.RankBy.DISTANCE,
+          type: 'restaurant',
+        },
+        (results, status) => {
+          if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
+            showResult('<div class="error-card">近くにレストランが見つかりませんでした。</div>');
+            btn.disabled = false;
+            return;
+          }
+          setStatus('詳細情報を取得中...');
+          // 最も近い店舗の詳細を取得
+          getDetails(service, results[0].place_id, lat, lng, btn);
+        }
+      );
+    }
+
+    function getDetails(service, placeId, userLat, userLng, btn) {
+      service.getDetails(
+        {
+          placeId,
+          fields: [
+            'name', 'rating', 'user_ratings_total', 'opening_hours',
+            'editorial_summary', 'reviews', 'geometry', 'url',
+            'price_level', 'types',
+          ],
+          language: 'ja',
+        },
+        (place, status) => {
+          btn.disabled = false;
+          if (status !== google.maps.places.PlacesServiceStatus.OK) {
+            showResult('<div class="error-card">店舗情報の取得に失敗しました。</div>');
+            return;
+          }
+          renderRestaurant(place, userLat, userLng);
+        }
+      );
+    }
+
+    // 距離計算（ハーバーサイン式）
+    function calcDistance(lat1, lng1, lat2, lng2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 +
+                Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function renderRestaurant(place, userLat, userLng) {
+      const today = ['日','月','火','水','木','金','土'][new Date().getDay()];
+
+      // ---- 店名・評価 ----
+      const ratingHtml = place.rating
+        ? `<span class="rating">
+             <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+             ${place.rating.toFixed(1)}
+           </span>
+           <span class="reviews-count">(${(place.user_ratings_total||0).toLocaleString()}件)</span>`
+        : '';
+
+      const distM = place.geometry
+        ? calcDistance(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng())
+        : null;
+      const distTag = distM !== null
+        ? `<span class="distance-tag">${distM < 1000 ? Math.round(distM)+'m' : (distM/1000).toFixed(1)+'km'}</span>`
+        : '';
+
+      // ---- 営業時間 ----
+      let hoursHtml = '';
+      if (place.opening_hours) {
+        const isOpen = place.opening_hours.isOpen();
+        const openStatus = `<div class="open-status ${isOpen ? 'open' : 'closed'}">
+          <div class="dot"></div>${isOpen ? '営業中' : '営業時間外'}
+        </div>`;
+
+        let weekdayRows = '';
+        const days = ['日曜日','月曜日','火曜日','水曜日','木曜日','金曜日','土曜日'];
+        const todayIdx = new Date().getDay();
+        if (place.opening_hours.weekday_text?.length) {
+          place.opening_hours.weekday_text.forEach((line, i) => {
+            // weekday_text は月〜日の順 (index 0=月)
+            const isToday = (i + 1) % 7 === todayIdx; // 月=0 → 実曜日1; 日=6 → 0
+            const parts = line.split(': ');
+            const dayName = parts[0];
+            const time = parts.slice(1).join(': ') || '情報なし';
+            weekdayRows += `<li class="${isToday ? 'today' : ''}">
+              <span class="day">${dayName}</span><span>${time}</span></li>`;
+          });
+        }
+
+        hoursHtml = `
+          <div class="card-section">
+            <div class="section-label">営業時間</div>
+            ${openStatus}
+            ${weekdayRows ? `<ul class="hours-list">${weekdayRows}</ul>` : '<p style="font-size:.85rem;color:var(--sub)">時間情報なし</p>'}
+          </div>`;
+      } else {
+        hoursHtml = `<div class="card-section">
+          <div class="section-label">営業時間</div>
+          <p style="font-size:.85rem;color:var(--sub)">情報なし</p>
+        </div>`;
+      }
+
+      // ---- おすすめメニュー ----
+      let menuHtml = '';
+      // editorial_summary があれば表示
+      const summary = place.editorial_summary?.overview || '';
+      // 口コミからよく出てくる料理名ワードを抽出
+      const foodKeywords = extractFoodKeywords(place.reviews || []);
+
+      if (foodKeywords.length || summary) {
+        menuHtml = `<div class="card-section">
+          <div class="section-label">おすすめ・特徴</div>
+          ${summary ? `<p class="editorial">${summary}</p>` : ''}
+          ${foodKeywords.length
+            ? `<div class="menu-chips">${foodKeywords.map(k=>`<span class="chip">${k}</span>`).join('')}</div>`
+            : ''}
+        </div>`;
+      } else {
+        menuHtml = `<div class="card-section">
+          <div class="section-label">おすすめ・特徴</div>
+          <p style="font-size:.85rem;color:var(--sub)">口コミ情報が少ないため表示できません</p>
+        </div>`;
+      }
+
+      // ---- 地図リンク ----
+      const mapsLink = place.url
+        ? `<a class="maps-link" href="${place.url}" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+              <circle cx="12" cy="9" r="2.5"/>
+            </svg>
+            Google マップで開く
+          </a>`
+        : '';
+
+      showResult(`
+        <div class="card">
+          <div class="card-head">
+            <div class="badge">最寄りのレストラン</div>
+            <h2>${escHtml(place.name)}</h2>
+            <div class="meta">${ratingHtml}${distTag}</div>
+          </div>
+          ${hoursHtml}
+          ${menuHtml}
+          ${mapsLink}
+        </div>
+      `);
+    }
+
+    // 口コミからフード関連キーワードを抽出（上位6個まで）
+    function extractFoodKeywords(reviews) {
+      const text = reviews.map(r => r.text || '').join(' ');
+      // カタカナ・ひらがな・漢字の2文字以上の単語を候補に
+      // 簡易的に「○○が美味しい」「○○をおすすめ」パターンを探す
+      const patterns = [
+        /([ぁ-んァ-ン一-龯a-zA-Z]{2,8})\s*(?:が|は|も)\s*(?:美味し|おいし|旨|うま|絶品|おすすめ|人気)/g,
+        /(?:おすすめ|人気|定番|名物)\s*(?:は|の)?\s*([ぁ-んァ-ン一-龯a-zA-Z]{2,8})/g,
+      ];
+      const found = new Map();
+      patterns.forEach(re => {
+        let m;
+        while ((m = re.exec(text)) !== null) {
+          const w = m[1].trim();
+          if (w.length >= 2) found.set(w, (found.get(w) || 0) + 1);
+        }
+      });
+      // 出現頻度順に並べて上位6個
+      return [...found.entries()]
+        .sort((a,b) => b[1]-a[1])
+        .slice(0, 6)
+        .map(e => e[0]);
+    }
+
+    function escHtml(s) {
+      return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Service Worker 登録
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
     }
