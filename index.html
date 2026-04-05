@@ -350,12 +350,10 @@
     }
 
     function loadGoogleMapsAndSearch(lat, lng, btn) {
-      // すでにロード済みなら直接実行
       if (window.google && window.google.maps && window.google.maps.places) {
         searchNearby(lat, lng, btn);
         return;
       }
-      // Google Maps JS API を動的ロード
       window._mapsCallback = () => searchNearby(lat, lng, btn);
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places&language=ja&callback=_mapsCallback`;
@@ -368,7 +366,6 @@
 
     function searchNearby(lat, lng, btn) {
       const center = new google.maps.LatLng(lat, lng);
-      // ダミーのマップ要素（PlacesServiceに必要）
       const mapDiv = document.createElement('div');
       const map = new google.maps.Map(mapDiv, { center, zoom: 15 });
       const service = new google.maps.places.PlacesService(map);
@@ -386,7 +383,6 @@
             return;
           }
           setStatus('詳細情報を取得中...');
-          // 最も近い店舗の詳細を取得
           getDetails(service, results[0].place_id, lat, lng, btn);
         }
       );
@@ -414,7 +410,6 @@
       );
     }
 
-    // 距離計算（ハーバーサイン式）
     function calcDistance(lat1, lng1, lat2, lng2) {
       const R = 6371000;
       const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -425,9 +420,6 @@
     }
 
     function renderRestaurant(place, userLat, userLng) {
-      const today = ['日','月','火','水','木','金','土'][new Date().getDay()];
-
-      // ---- 店名・評価 ----
       const ratingHtml = place.rating
         ? `<span class="rating">
              <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
@@ -443,7 +435,6 @@
         ? `<span class="distance-tag">${distM < 1000 ? Math.round(distM)+'m' : (distM/1000).toFixed(1)+'km'}</span>`
         : '';
 
-      // ---- 営業時間 ----
       let hoursHtml = '';
       if (place.opening_hours) {
         const isOpen = place.opening_hours.isOpen();
@@ -452,12 +443,10 @@
         </div>`;
 
         let weekdayRows = '';
-        const days = ['日曜日','月曜日','火曜日','水曜日','木曜日','金曜日','土曜日'];
         const todayIdx = new Date().getDay();
         if (place.opening_hours.weekday_text?.length) {
           place.opening_hours.weekday_text.forEach((line, i) => {
-            // weekday_text は月〜日の順 (index 0=月)
-            const isToday = (i + 1) % 7 === todayIdx; // 月=0 → 実曜日1; 日=6 → 0
+            const isToday = (i + 1) % 7 === todayIdx;
             const parts = line.split(': ');
             const dayName = parts[0];
             const time = parts.slice(1).join(': ') || '情報なし';
@@ -479,11 +468,8 @@
         </div>`;
       }
 
-      // ---- おすすめメニュー ----
       let menuHtml = '';
-      // editorial_summary があれば表示
       const summary = place.editorial_summary?.overview || '';
-      // 口コミからよく出てくる料理名ワードを抽出
       const foodKeywords = extractFoodKeywords(place.reviews || []);
 
       if (foodKeywords.length || summary) {
@@ -501,7 +487,6 @@
         </div>`;
       }
 
-      // ---- 地図リンク ----
       const mapsLink = place.url
         ? `<a class="maps-link" href="${place.url}" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -526,11 +511,8 @@
       `);
     }
 
-    // 口コミからフード関連キーワードを抽出（上位6個まで）
     function extractFoodKeywords(reviews) {
       const text = reviews.map(r => r.text || '').join(' ');
-      // カタカナ・ひらがな・漢字の2文字以上の単語を候補に
-      // 簡易的に「○○が美味しい」「○○をおすすめ」パターンを探す
       const patterns = [
         /([ぁ-んァ-ン一-龯a-zA-Z]{2,8})\s*(?:が|は|も)\s*(?:美味し|おいし|旨|うま|絶品|おすすめ|人気)/g,
         /(?:おすすめ|人気|定番|名物)\s*(?:は|の)?\s*([ぁ-んァ-ン一-龯a-zA-Z]{2,8})/g,
@@ -543,7 +525,6 @@
           if (w.length >= 2) found.set(w, (found.get(w) || 0) + 1);
         }
       });
-      // 出現頻度順に並べて上位6個
       return [...found.entries()]
         .sort((a,b) => b[1]-a[1])
         .slice(0, 6)
@@ -554,7 +535,6 @@
       return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    // Service Worker 登録
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
     }

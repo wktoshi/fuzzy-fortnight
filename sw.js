@@ -18,7 +18,6 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Google Maps API はキャッシュしない（常に最新を取得）
   if (event.request.url.includes('maps.googleapis.com')) {
     event.respondWith(fetch(event.request));
     return;
